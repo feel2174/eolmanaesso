@@ -747,10 +747,6 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
     엑셀 파일 불러오기
   </button>
-  <button id="syncLocalBtn" style="display:none">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-    클라우드 동기화
-  </button>
   <button id="logoutBtn" style="display:none;color:var(--danger)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
     로그아웃
@@ -1477,7 +1473,6 @@
   const loginKakaoBtn = document.getElementById('loginKakaoBtn');
   const logoutBtn = document.getElementById('logoutBtn');
   const shareLedgerBtn = document.getElementById('shareLedgerBtn');
-  const syncLocalBtn = document.getElementById('syncLocalBtn');
 
   // 모달 엘리먼트
   const shareModal = document.getElementById('shareModal');
@@ -1488,28 +1483,33 @@
   const joinGroupBtn = document.getElementById('joinGroupBtn');
   const closeShareModalBtn = document.getElementById('closeShareModalBtn');
 
+  // 기본 프로필 아바타 (귀여운 카카오 옐로우/브라운 테마 SVG)
+  const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='20' fill='%23FEE500'/%3E%3Cpath d='M20 20a6 6 0 100-12 6 6 0 000 12zm0 4c-6.67 0-12 3.58-12 8v1a1 1 0 001 1h22a1 1 0 001-1v-1c0-4.42-5.33-8-12-8z' fill='%233C1E1E'/%3E%3C/svg%3E";
+
   // 인증 및 소속 그룹 상태 갱신
   function updateAuthUI(user, group){
     if(user){
-      const name = user.nickname || user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.nickname || (user.email ? user.email.split('@')[0] : '사용자');
-      const avatar = user.avatarUrl || user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
+      const name = user.nickname || '사용자';
+      let avatar = user.avatarUrl || user.avatar_url || '';
+      if(avatar && avatar.startsWith('http://')){
+        avatar = avatar.replace('http://', 'https://');
+      }
       
       menuUserName.textContent = name;
       menuUserGroup.textContent = group ? `📖 ${group.name}` : '📖 개인 장부';
-      if(avatar){
-        userAvatar.src = avatar;
-        menuUserAvatar.src = avatar;
-        userBtn.style.display = 'flex';
-        menuUserCard.style.display = 'flex';
-      } else {
-        userBtn.style.display = 'none';
-        menuUserCard.style.display = 'flex';
-      }
+      
+      const effectiveAvatar = avatar || DEFAULT_AVATAR;
+      userAvatar.src = effectiveAvatar;
+      userAvatar.onerror = () => { userAvatar.src = DEFAULT_AVATAR; };
+      menuUserAvatar.src = effectiveAvatar;
+      menuUserAvatar.onerror = () => { menuUserAvatar.src = DEFAULT_AVATAR; };
+
+      userBtn.style.display = 'flex';
+      menuUserCard.style.display = 'flex';
 
       loginKakaoBtn.style.display = 'none';
       logoutBtn.style.display = 'flex';
       shareLedgerBtn.style.display = 'flex';
-      syncLocalBtn.style.display = 'flex';
       if(group && group.inviteCode){ myInviteCode.textContent = group.inviteCode; }
     } else {
       userBtn.style.display = 'none';
@@ -1517,7 +1517,6 @@
       loginKakaoBtn.style.display = 'flex';
       logoutBtn.style.display = 'none';
       shareLedgerBtn.style.display = 'none';
-      syncLocalBtn.style.display = 'none';
       myInviteCode.textContent = '------';
     }
   }
@@ -1762,19 +1761,6 @@
     }
   });
 
-  // 클라우드 동기화
-  syncLocalBtn.addEventListener('click', async () => {
-    dropdown.classList.remove('show');
-    if(!records || records.length === 0){ toast('동기화할 기록이 없어요'); return; }
-    syncLocalBtn.disabled = true;
-    const res = await window.CloudService.syncLocalToCloud(records);
-    syncLocalBtn.disabled = false;
-    if(res && res.success){
-      toast(`${res.count}건을 클라우드에 안전하게 보관했어요 ☁️`);
-    } else {
-      toast('동기화 완료: 최신 상태입니다');
-    }
-  });
 
   // ===== 엑셀 파일로 내보내기 (수식 인젝션 방어 적용) =====
   const exportCsvBtn = document.getElementById('exportCsvBtn');

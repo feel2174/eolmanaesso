@@ -37,8 +37,15 @@ export async function onRequestGet(context) {
     });
     const userData = await userRes.json();
     const kakaoId = String(userData.id);
-    const nickname = userData.kakao_account?.profile?.nickname || '사용자';
-    const avatarUrl = userData.kakao_account?.profile?.profile_image_url || '';
+    const nickname = userData.kakao_account?.profile?.nickname || userData.properties?.nickname || '사용자';
+    let avatarUrl = userData.kakao_account?.profile?.profile_image_url
+                 || userData.kakao_account?.profile?.thumbnail_image_url
+                 || userData.properties?.profile_image
+                 || userData.properties?.thumbnail_image
+                 || '';
+    if (avatarUrl && avatarUrl.startsWith('http://')) {
+      avatarUrl = avatarUrl.replace('http://', 'https://');
+    }
 
     let userId = `kakao_${kakaoId}`;
 
