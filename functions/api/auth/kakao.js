@@ -1,4 +1,4 @@
-import { createSessionToken } from '../_auth.js';
+import { createSessionToken, ensureTables } from '../_auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -24,6 +24,7 @@ export async function onRequestGet(context) {
 
     if (env.DB) {
       try {
+        await ensureTables(env.DB);
         await env.DB.prepare(`
           INSERT OR IGNORE INTO users (id, kakao_id, nickname, avatar_url)
           VALUES (?, ?, ?, ?)

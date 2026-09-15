@@ -1,4 +1,4 @@
-import { createSessionToken } from '../_auth.js';
+import { createSessionToken, ensureTables } from '../_auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -42,8 +42,9 @@ export async function onRequestGet(context) {
 
     let userId = `kakao_${kakaoId}`;
 
-    // 3. D1 DB가 있으면 저장
+    // 3. D1 DB가 있으면 저장 (테이블 자동 초기화 보장)
     if (env.DB) {
+      await ensureTables(env.DB);
       const existingUser = await env.DB.prepare('SELECT id FROM users WHERE kakao_id = ?').bind(kakaoId).first();
       if (existingUser) {
         userId = existingUser.id;
