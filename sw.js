@@ -1,14 +1,12 @@
-﻿// 얼마내쏘 서비스 워커 (PWA 오프라인 캐싱)
-const CACHE_NAME = 'gyeongjosa-v1';
+// 얼마내쏘 서비스 워커 (PWA 오프라인 캐싱)
+const CACHE_NAME = 'gyeongjosa-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './config.js',
-  './supabaseClient.js',
+  './cloudSync.js',
   './manifest.webmanifest',
   './icon.svg',
-  'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+  'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css'
 ];
 
 self.addEventListener('install', event => {
@@ -32,8 +30,8 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Supabase API 호출 등은 네트워크 우선
-  if (event.request.url.includes('.supabase.co') || event.request.method !== 'GET') {
+  // API 호출 등은 네트워크 우선
+  if (event.request.url.includes('/api/') || event.request.method !== 'GET') {
     return;
   }
   event.respondWith(

@@ -1,4 +1,4 @@
-﻿# 얼마내쏘 · 경조사 장부 (Eolmanaesso)
+# 얼마내쏘 · 경조사 장부 (Eolmanaesso)
 
 > **말이 없다. 한 줄을 쓴다. 돌아간다.**  
 > 물가 반영 축의금 추천과 부부/가족 실시간 공유가 가능한 스마트 경조사 장부
@@ -17,7 +17,7 @@
 4. **PWA (Progressive Web App) 지원**
    - 모바일 브라우저에서 '홈 화면에 추가' 시 앱 아이콘 설치 및 오프라인 동작 지원
 5. **백업 및 복원**
-   - JSON 및 향후 엑셀(CSV) 호환 지원
+   - 엑셀(CSV) 내보내기 및 가져오기 지원
 
 ---
 
@@ -25,4 +25,4 @@
 
 - **Frontend**: Vanilla HTML5, CSS3, JavaScript (Pretendard 폰트)
 - **PWA**: Service Worker (`sw.js`), Web App Manifest (`manifest.webmanifest`)
-- **Backend / Database**: Cloudflare Pages / Supabase (PostgreSQL + RLS) or Cloudflare D1
+- **Backend / Database**: Cloudflare Pages Functions + Cloudflare D1 (SQLite)
