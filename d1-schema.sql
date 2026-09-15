@@ -44,6 +44,14 @@ CREATE TABLE IF NOT EXISTS records (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 5. 공유 장부(유료) 권한 테이블: 장부(그룹) 단위, expires_at NULL = 기간 제한 없음
+CREATE TABLE IF NOT EXISTS entitlements (
+    group_id TEXT PRIMARY KEY,
+    plan TEXT NOT NULL,
+    expires_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 성능 최적화 인덱스
 CREATE INDEX IF NOT EXISTS idx_records_group ON records(group_id);
 CREATE INDEX IF NOT EXISTS idx_records_date ON records(date DESC);

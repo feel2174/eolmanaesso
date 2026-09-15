@@ -1,4 +1,4 @@
-import { getSessionFromRequest, jsonResponse, ensureTables, generateSecureInviteCode } from '../_auth.js';
+import { getSessionFromRequest, jsonResponse, ensureTables, generateSecureInviteCode, isGroupPremium } from '../_auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -8,12 +8,14 @@ export async function onRequestGet(context) {
     return jsonResponse({ authenticated: false });
   }
 
+  const user = { id: session.userId, nickname: session.nickname, avatarUrl: session.avatarUrl };
+
   // D1 DB가 바인딩되어 있지 않은 경우
   if (!env.DB) {
     return jsonResponse({
       authenticated: true,
-      user: { id: session.userId, nickname: session.nickname, avatarUrl: session.avatarUrl },
-      group: { id: 'local-group', name: '나의 장부', inviteCode: 'OFFLINE' }
+      user,
+      group: { id: 'local-group', name: '나의 장부', inviteCode: 'OFFLINE', premium: false }
     });
   }
 
@@ -36,7 +38,8 @@ export async function onRequestGet(context) {
         id: memberRow.group_id,
         name: memberRow.name,
         inviteCode: memberRow.invite_code,
-        role: memberRow.role
+        role: memberRow.role,
+        premium: await isGroupPremium(env.DB, memberRow.group_id)
       };
     } else {
       // 그룹이 없으면 기본 그룹 자동 생성
@@ -45,43 +48,32 @@ export async function onRequestGet(context) {
       const groupName = `${session.nickname}의 장부`;
 
       try {
-        await env.DB.prepare(`
-          INSERT INTO ledger_groups (id, name, invite_code, created_by)
-          VALUES (?, ?, ?, ?)
-        `).bind(newGroupId, groupName, inviteCode, session.userId).run();
+        await env.DB.batch([
+          env.DB.prepare(`
+            INSERT INTO ledger_groups (id, name, invite_code, created_by)
+            VALUES (?, ?, ?, ?)
+          `).bind(newGroupId, groupName, inviteCode, session.userId),
+          env.DB.prepare(`
+            INSERT INTO ledger_members (group_id, user_id, role)
+            VALUES (?, ?, 'owner')
+          `).bind(newGroupId, session.userId)
+        ]);
 
-        await env.DB.prepare(`
-          INSERT INTO ledger_members (group_id, user_id, role)
-          VALUES (?, ?, 'owner')
-        `).bind(newGroupId, session.userId).run();
-
-        group = { id: newGroupId, name: groupName, inviteCode, role: 'owner' };
+        group = { id: newGroupId, name: groupName, inviteCode, role: 'owner', premium: false };
       } catch (insertErr) {
         console.warn('Group auto-creation warning:', insertErr.message);
-        group = { id: 'default-group', name: groupName, inviteCode: 'MYBONGTOO', role: 'owner' };
+        group = { id: 'default-group', name: groupName, inviteCode: 'MYBONGTOO', role: 'owner', premium: false };
       }
     }
 
-    return jsonResponse({
-      authenticated: true,
-      user: {
-        id: session.userId,
-        nickname: session.nickname,
-        avatarUrl: session.avatarUrl
-      },
-      group
-    });
+    return jsonResponse({ authenticated: true, user, group });
   } catch (err) {
     console.error('me.js error:', err);
     // 에러 발생 시에도 세션이 유효하면 로그인 상태 유지 (서비스 중단 방지)
     return jsonResponse({
       authenticated: true,
-      user: {
-        id: session.userId,
-        nickname: session.nickname,
-        avatarUrl: session.avatarUrl
-      },
-      group: { id: 'fallback-group', name: '나의 장부', inviteCode: 'CONNECT' }
+      user,
+      group: { id: 'fallback-group', name: '나의 장부', inviteCode: 'CONNECT', premium: false }
     });
   }
 }

@@ -16,7 +16,7 @@
 | **인프라/호스팅** | Cloudflare Pages + Cloudflare Pages Functions |
 | **데이터베이스** | Cloudflare D1 (Serverless SQLite, Binding: `DB`) |
 | **소셜 로그인** | 카카오 로그인 (Kakao OAuth 2.0 REST API) |
-| **라이선스 / 모델** | 부분 유료화 (Freemium: 30건 무료 + 9,900원 평생 소장권) |
+| **라이선스 / 모델** | 부분 유료화 (Freemium: 기록 저장·백업 무료 + 부부·가족 공유 장부만 유료, 실결제는 Phase 1 예정) |
 
 ---
 
@@ -166,28 +166,38 @@ node tests/record-lifecycle.test.mjs
 ## 💎 6. 핵심 비즈니스 로직 및 기능 상세
 
 ### 6.1. 유료화(페이월) 전환 퍼널
-* **30건 무료 한도**:
-  - 무료 사용자는 최대 30건까지 자유롭게 기록.
-  - 31번째 기록 시도 시 `#premiumModal`이 팝업되며 등록 차단.
-  - 헤더와 목록 상단에 `[기록 0/30건 (무료)]` 실시간 상태 표시 (25건 이상 시 경고색, 30건 도달 시 위험색).
-* **부부·가족 실시간 공유 잠금**:
-  - 무료 사용자가 "부부·가족 공유 관리" 메뉴 진입 시 프리미엄 안내 모달 호출.
-* **플랜 구성**:
-  - **평생 소장권 (9,900원)**: 1회 결제로 부부 2인 평생 무제한 클라우드 장부 제공 (주력 상품).
-  - **결혼식 패스 (5,900원)**: 6개월 단기 집중 정산용 패스.
+* **무료**: 카카오 로그인, 기록 저장(건수 제한 없음), 클라우드 백업, 답례 문구, 엑셀 내보내기/가져오기.
+* **유료: 부부·가족 공유 장부**
+  - 권한은 **장부(그룹) 단위**로 D1 `entitlements` 테이블에 저장되고, `/api/auth/me`의 `group.premium`으로 내려감. 브라우저 localStorage는 권한 판단에 쓰지 않음.
+  - 권한 있는 장부만 내 초대 코드가 보이고, `/api/group` 참여도 서버에서 권한 장부만 허용(403 `PREMIUM_REQUIRED`).
+  - 초대받아 참여한 가족은 추가 결제 없이 같은 권한 사용.
+* **플랜 표기**: 평생 이용권 9,900원(1회) / 결혼식 패스 5,900원(6개월, 자동 갱신 없음).
+* **결제 연동 전 권한 부여 (D1 콘솔)**:
+  ```sql
+  -- 장부 ID 확인: SELECT lg.id, lg.name FROM ledger_groups lg JOIN ledger_members lm ON lm.group_id = lg.id JOIN users u ON u.id = lm.user_id WHERE u.nickname = '닉네임';
+  INSERT INTO entitlements (group_id, plan) VALUES ('<group_id>', 'lifetime');
+  INSERT INTO entitlements (group_id, plan, expires_at) VALUES ('<group_id>', 'season', datetime('now', '+6 months'));
+  ```
 
 ### 6.2. 부부/가족 실시간 공유 장부
 * **CSPRNG 8자리 초대코드**:
   - 숫자와 헷갈리기 쉬운 문자(0, O, 1, I)를 배제한 `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` 문자셋 사용.
   - 카카오톡으로 원클릭 초대장 링크 전송 가능.
 * **1인 1활성 장부 원칙**:
-  - 배우자의 초대 코드를 입력하면 기존 개인 장부에서 새 부부 장부로 안전하게 이동(`DELETE FROM ledger_members` 후 새 `group_id` 연결).
+  - 배우자의 초대 코드를 입력하면 기존 개인 장부에서 새 부부 장부로 이동(멤버 교체를 하나의 D1 batch로 처리).
+  - 혼자 쓰던 장부의 기록은 새 장부로 함께 옮김. 다른 멤버가 남는 장부의 기록은 그 장부에 둠.
+  - 비로그인 상태로 초대 링크를 열면 코드를 sessionStorage에 보관하고 카카오 로그인 후 이어서 연결.
 
 ### 6.3. 보안 설계 (Security Hardened)
 * **HMAC-SHA256 + Timing-Safe**:
   - 세션 토큰은 `payload.signature` 형식이며, `crypto.subtle` 및 `timingSafeEqual`(상수 시간 비교)을 통해 위변조 및 타이밍 공격(CWE-208) 완벽 방어.
 * **IDOR 방어 (CWE-639)**:
   - `records` 저장 및 수정 시 `WHERE records.group_id = excluded.group_id` 절을 적용하여 타인의 레코드 ID 조작 덮어쓰기를 원천 방어.
+* **JWT_SECRET 필수 (CWE-798)**: 환경변수가 없으면 세션 발급·검증을 모두 거부. 소스 내 대체 키와 데모 로그인은 제거됨. 로컬 개발도 `.dev.vars`에 `JWT_SECRET` 필요.
+* **OAuth state (CWE-352)**: `/api/auth/kakao`가 `oauth_state` 쿠키를 발급하고 콜백에서 비교. 실패 시 `/?login_failed=1`로 이동(오류 상세는 서버 로그에만).
+* **서버 입력 검증 (CWE-20/770)**: `validateRecord`로 방향·금액·날짜·길이 검증, 요청당 최대 500건, 형식 오류 항목은 건너뛰고 `skipped`로 응답.
+* **보안 헤더**: `_headers`로 CSP, HSTS, X-Frame-Options, Permissions-Policy 적용.
+* **공유 기기 보호**: 로그아웃 시 로컬 기록을 클라우드에 저장한 뒤 기기에서 삭제. 다른 계정으로 로그인하면 이전 계정 로컬 기록은 섞지 않고 백업 키로만 보관.
 * **CSV Formula Injection 방어 (CWE-1236)**:
   - 엑셀 내보내기 시 `=, +, -, @, \t, \r` 문자로 시작하는 셀 값에 자동으로 접두 작은따옴표(`'`)를 붙여 악성 매크로/수식 실행 방지.
 

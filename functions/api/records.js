@@ -1,4 +1,6 @@
-import { getSessionFromRequest, jsonResponse, ensureTables } from './_auth.js';
+import { getSessionFromRequest, jsonResponse, ensureTables, validateRecord } from './_auth.js';
+
+const MAX_BATCH = 500;
 
 // GET: 소속 장부의 모든 기록 조회
 export async function onRequestGet(context) {
@@ -39,7 +41,7 @@ export async function onRequestGet(context) {
   }
 }
 
-// POST: 기록 단건 추가/수정 또는 배열 일괄 동기화
+// POST: 기록 단건 추가/수정 또는 배열 일괄 동기화 (최대 MAX_BATCH건, 형식이 잘못된 항목은 건너뜀)
 export async function onRequestPost(context) {
   const { request, env } = context;
   const session = await getSessionFromRequest(request, env);
@@ -52,11 +54,23 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: true, count: 1, note: 'DB 미연결 (로컬 유지)' });
   }
 
+  const body = await request.json().catch(() => null);
+  if (body === null || typeof body !== 'object') {
+    return jsonResponse({ error: '잘못된 요청 형식입니다.' }, 400);
+  }
+  const items = Array.isArray(body) ? body : [body];
+
+  if (items.length === 0 || items.length > MAX_BATCH) {
+    return jsonResponse({ error: `한 번에 1~${MAX_BATCH}건까지 저장할 수 있습니다.` }, 400);
+  }
+
+  const valid = items.map(validateRecord).filter(Boolean);
+  if (valid.length === 0) {
+    return jsonResponse({ error: '저장할 수 있는 올바른 기록이 없습니다.', skipped: items.length }, 400);
+  }
+
   try {
     await ensureTables(env.DB);
-    const body = await request.json();
-    const isBatch = Array.isArray(body);
-    const items = isBatch ? body : [body];
 
     // 소속 그룹 찾기
     const member = await env.DB.prepare(`
@@ -85,22 +99,11 @@ export async function onRequestPost(context) {
       WHERE records.group_id = excluded.group_id
     `);
 
-    const batch = items.map(it => stmt.bind(
-      String(it.id),
-      groupId,
-      session.userId,
-      it.direction || 'give',
-      String(it.name || '무명').trim(),
-      it.relation || '기타',
-      it.category || '기타',
-      Number(it.amount) || 0,
-      it.date || new Date().toISOString().slice(0, 10),
-      it.memo || ''
-    ));
+    await env.DB.batch(valid.map(r => stmt.bind(
+      r.id, groupId, session.userId, r.direction, r.name, r.relation, r.category, r.amount, r.date, r.memo
+    )));
 
-    await env.DB.batch(batch);
-
-    return jsonResponse({ success: true, count: items.length });
+    return jsonResponse({ success: true, count: valid.length, skipped: items.length - valid.length });
   } catch (err) {
     console.error('records POST error:', err);
     return jsonResponse({ error: '기록 저장 중 오류가 발생했습니다.' }, 500);
@@ -118,7 +121,7 @@ export async function onRequestDelete(context) {
     return jsonResponse({ error: '로그인이 필요합니다.' }, 401);
   }
 
-  if (!recordId) {
+  if (!recordId || recordId.length > 64) {
     return jsonResponse({ error: '삭제할 record id가 필요합니다.' }, 400);
   }
 
@@ -138,6 +141,6 @@ export async function onRequestDelete(context) {
     return jsonResponse({ success: true, id: recordId });
   } catch (err) {
     console.error('records DELETE error:', err);
-    return jsonResponse({ error: err.message }, 500);
+    return jsonResponse({ error: '기록 삭제 중 오류가 발생했습니다.' }, 500);
   }
 }

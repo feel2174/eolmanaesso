@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#FEE500">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -15,6 +15,7 @@
     localStorage.removeItem('gyeongjosa_config');
     localStorage.removeItem('supabase.auth.token');
     localStorage.removeItem('supabase_config');
+    localStorage.removeItem('is_premium'); // 권한은 서버에서만 판단
     if ('caches' in window) {
       caches.keys().then(keys => {
         keys.forEach(k => {
@@ -32,15 +33,16 @@
     --point:#FEE500;
     --on-point:#3C1E1E;
     --text:#191919;
-    --sub:#8B8B8B;
+    --sub:#6B6B6B;    /* 배경 대비 4.8:1 */
     --line:#E8E4D8;
-    --give:#8B8B8B;   /* 냄 (회색) */
-    --receive:#2C7BE5;/* 받음 (파랑) */
-    --danger:#E5484D;
+    --give:#5F5F5F;   /* 냄 (회색) */
+    --receive:#1F66C9;/* 받음 (파랑) */
+    --danger:#C9302C;
     --shadow:0 1px 3px rgba(60,30,30,.05), 0 1px 2px rgba(60,30,30,.04);
     --radius:14px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  :focus-visible{outline:2px solid var(--on-point);outline-offset:2px;}
   html,body{margin:0;padding:0;}
   body{
     font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;
@@ -152,10 +154,10 @@
   .search-box input{
     width:100%;height:46px;
     background:var(--card);border:1px solid var(--line);border-radius:12px;
-    padding:0 40px 0 42px;font-size:15px;color:var(--text);
+    padding:0 40px 0 42px;font-size:16px;color:var(--text);
     outline:none;
   }
-  .search-box input:focus{border-color:var(--point);}
+  .search-box input:focus{border-color:var(--on-point);}
   .search-clear{
     position:absolute;right:6px;top:50%;transform:translateY(-50%);
     width:38px;height:38px;display:none;align-items:center;justify-content:center;
@@ -310,9 +312,9 @@
 
   .text-input,.date-input{
     width:100%;height:48px;background:var(--card);border:1px solid var(--line);
-    border-radius:12px;padding:0 14px;font-size:15px;color:var(--text);outline:none;
+    border-radius:12px;padding:0 14px;font-size:16px;color:var(--text);outline:none;
   }
-  .text-input:focus,.date-input:focus{border-color:var(--point);}
+  .text-input:focus,.date-input:focus{border-color:var(--on-point);}
 
   /* 자동완성 */
   .autocomplete{position:relative;}
@@ -348,7 +350,7 @@
     position:absolute;right:16px;top:50%;transform:translateY(-50%);
     font-size:16px;font-weight:700;color:var(--sub);pointer-events:none;
   }
-  .amount-input:focus{border-color:var(--point);}
+  .amount-input:focus{border-color:var(--on-point);}
   .quick-amt{display:flex;gap:8px;margin-top:10px;}
   .quick-amt button{
     flex:1;height:38px;border-radius:10px;background:var(--card);border:1px solid var(--line);
@@ -449,33 +451,6 @@
     color: #D35400;
   }
 
-  .list-meta-row{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 4px 8px;
-  }
-  .limit-status{
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--sub);
-  }
-  .limit-status.near-limit{
-    color: #E67E22;
-  }
-  .limit-status.reached-limit{
-    color: var(--danger);
-  }
-  .unlock-link{
-    font-size: 12px;
-    font-weight: 800;
-    color: #B8860B;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 2px 4px;
-  }
-
   /* ===== 프리미엄 페이월 모달 ===== */
   .premium-box{
     max-width: 380px !important;
@@ -531,7 +506,7 @@
     top: -10px;
     left: 50%;
     transform: translateX(-50%);
-    background: #F59E0B;
+    background: #B45309;
     color: #fff;
     font-size: 10px;
     font-weight: 800;
@@ -549,7 +524,7 @@
     height: 48px;
     border: none;
     border-radius: 14px;
-    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    background: linear-gradient(135deg, #B45309 0%, #92400E 100%);
     color: #fff;
     font-size: 15px;
     font-weight: 800;
@@ -618,8 +593,8 @@
   }
   .aud-chip.active{
     border-color: var(--point);
-    color: var(--point);
-    background: #EBF3FF;
+    color: var(--on-point);
+    background: var(--point);
   }
 
   .message-preview-box{
@@ -668,7 +643,7 @@
   <header class="header">
     <div class="header-left">
       <h1>얼마내쏘</h1>
-      <button class="premium-chip" id="premiumHeaderBtn">👑 평생 소장권</button>
+      <button class="premium-chip" id="premiumHeaderBtn">💑 부부 공유</button>
     </div>
     <div class="header-right">
       <button class="user-btn" id="userBtn" aria-label="프로필" style="display:none">
@@ -700,12 +675,6 @@
   <!-- 필터 칩 -->
   <div class="chips-scroll" id="filterChips"></div>
 
-  <!-- 기록 한도 및 프리미엄 인디케이터 -->
-  <div class="list-meta-row" id="listMetaRow">
-    <span class="limit-status" id="limitStatus">기록 0/30건 (무료)</span>
-    <button class="unlock-link" id="unlockLinkBtn">👑 무제한 혜택</button>
-  </div>
-
   <!-- 목록 -->
   <div class="list" id="list"></div>
 </div>
@@ -723,10 +692,6 @@
     </div>
   </div>
   
-  <button id="menuPremiumBtn" style="color:#B8860B;background:#FFF9E6;font-weight:700;">
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
-    프리미엄 평생 소장권
-  </button>
   <button id="loginKakaoBtn" style="color:#3C1E1E;background:#FEE500;font-weight:700;">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3c-5.5 0-10 3.5-10 7.8 0 2.8 1.9 5.3 4.8 6.7-.2.7-.8 2.6-.9 3 0 .2.1.3.3.2.3-.2 3.6-2.4 4.2-2.8.5.1 1.1.1 1.6.1 5.5 0 10-3.5 10-7.8S17.5 3 12 3z"/></svg>
     카카오로 시작하기
@@ -760,7 +725,7 @@
     <h3>부부·가족 공유 장부</h3>
     <p>초대 코드를 통해 신랑과 신부가 같은 장부를 실시간으로 함께 관리할 수 있어요.</p>
     
-    <div class="modal-section">
+    <div class="modal-section" id="myInviteSection">
       <div class="modal-section-title">내 장부 초대 코드</div>
       <div class="invite-code-display" id="myInviteCode">------</div>
       <div class="modal-btn-row" style="margin-top:8px">
@@ -784,8 +749,8 @@
   <div class="modal-box premium-box">
     <div class="premium-header">
       <div class="crown-icon">👑</div>
-      <h3 id="premiumModalTitle">얼마내쏘 프리미엄</h3>
-      <p id="premiumModalSubtitle">소중한 경조사비, 평생 안전하고 편리하게 관리하세요.</p>
+      <h3 id="premiumModalTitle">부부·가족 공유 장부</h3>
+      <p id="premiumModalSubtitle">배우자·가족과 한 장부를 실시간으로 함께 기록해요.</p>
     </div>
 
     <!-- 혜택 카드 -->
@@ -793,29 +758,22 @@
       <div class="perk-item">
         <span class="perk-icon">💑</span>
         <div class="perk-text">
-          <strong>부부·가족 실시간 동기화</strong>
-          <span>신랑과 신부가 각자 폰에서 실시간으로 함께 기록</span>
+          <strong>실시간 공유 장부</strong>
+          <span>초대 코드 하나로 배우자와 같은 장부를 각자 폰에서 함께 기록</span>
         </div>
       </div>
       <div class="perk-item">
-        <span class="perk-icon">♾️</span>
+        <span class="perk-icon">🎁</span>
         <div class="perk-text">
-          <strong>무제한 기록 등록</strong>
-          <span>무료 30건 제한 없이 수백~수천 건 평생 기록</span>
+          <strong>초대받은 가족은 추가 결제 없음</strong>
+          <span>결제한 장부에 참여한 가족도 공유 기능을 함께 사용</span>
         </div>
       </div>
       <div class="perk-item">
-        <span class="perk-icon">☁️</span>
+        <span class="perk-icon">✅</span>
         <div class="perk-text">
-          <strong>클라우드 영구 안전 백업</strong>
-          <span>기기 변경/분실에도 안전한 데이터 영구 보존</span>
-        </div>
-      </div>
-      <div class="perk-item">
-        <span class="perk-icon">💌</span>
-        <div class="perk-text">
-          <strong>카톡 감사 답례장 & 부모님 정산서</strong>
-          <span>상황별 답례 인사말 템플릿 10종 및 맞춤 서식</span>
+          <strong>기록 저장·클라우드 백업은 계속 무료</strong>
+          <span>유료 기능은 공유 장부 하나뿐이에요</span>
         </div>
       </div>
     </div>
@@ -823,24 +781,24 @@
     <!-- 가격 선택 카드 -->
     <div class="pricing-cards">
       <div class="pricing-card active" id="planLifetime" data-plan="lifetime">
-        <div class="pricing-tag">BEST · 평생 소장</div>
-        <div class="pricing-title">평생 소장권</div>
+        <div class="pricing-tag">추천</div>
+        <div class="pricing-title">평생 이용권</div>
         <div class="pricing-price">9,900원 <span>(1회)</span></div>
-        <div class="pricing-desc">부부 2인 평생 무료 소장</div>
+        <div class="pricing-desc">추가 결제 없음</div>
       </div>
       <div class="pricing-card" id="planSeason" data-plan="season">
-        <div class="pricing-tag">6개월 시즌</div>
         <div class="pricing-title">결혼식 패스</div>
         <div class="pricing-price">5,900원 <span>(6개월)</span></div>
-        <div class="pricing-desc">단기 집중 정산용</div>
+        <div class="pricing-desc">자동 갱신 없음</div>
       </div>
     </div>
 
     <button class="btn-premium-cta" id="buyPremiumBtn">
-      <span id="buyBtnText">지금 9,900원으로 평생 소장하기</span>
+      <span id="buyBtnText">9,900원으로 공유 장부 시작하기</span>
     </button>
-    <div class="premium-guarantee">🔒 추가 구독료 없는 1회 결제 · 부부 2인 자동 동시 적용</div>
-    <button class="btn-sub" id="closePremiumModalBtn" style="width:100%;height:40px;border-radius:12px;margin-top:8px">나중에 둘러보기</button>
+    <div class="premium-guarantee" id="premiumGuarantee">1회 결제 · 서비스 운영 기간 동안 추가 결제 없음</div>
+    <button class="btn-sub" id="haveInviteBtn" style="width:100%;height:44px;border-radius:12px;margin-top:8px">초대 코드를 받았어요</button>
+    <button class="btn-sub" id="closePremiumModalBtn" style="width:100%;height:44px;border-radius:12px;margin-top:8px">나중에 둘러보기</button>
   </div>
 </div>
 
@@ -1007,8 +965,13 @@
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
       const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr : [];
+      return Array.isArray(arr) ? arr.map(r => ({ ...r, date: normalizeDate(r.date) })) : [];
     }catch(e){ return []; }
+  }
+  // 2024/5/3, 2024.05.03 → 2024-05-03 (해석할 수 없으면 원본 유지)
+  function normalizeDate(s){
+    const m = String(s||'').trim().match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/);
+    return m ? `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}` : s;
   }
   function save(){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
@@ -1080,12 +1043,13 @@
       msg.textContent = '기록이 없어요';
       msg.className = 'summary-msg';
     } else if(diff < 0){
-      // 내가 덜 냄 → 받은 게 적음? 스펙: 차액 마이너스(내가 덜 냄) = 아직 갚을 게 남았어요
-      msg.textContent = '아직 갚을 게 남았어요';
-      msg.className = 'summary-msg neg';
-    } else if(diff > 0){
+      // 받은 - 낸 < 0 → 내가 더 냈음
       msg.textContent = '내가 더 냈어요';
       msg.className = 'summary-msg pos';
+    } else if(diff > 0){
+      // 받은 게 더 많음 → 아직 갚을 게 남음
+      msg.textContent = '아직 갚을 게 남았어요';
+      msg.className = 'summary-msg neg';
     } else {
       msg.textContent = '딱 맞게 주고받았어요';
       msg.className = 'summary-msg';
@@ -1147,7 +1111,7 @@
   }
 
   function render(){
-    updateLimitUI();
+    updatePremiumUI();
     renderFilterChips();
     if(records.length === 0){
       summaryEl.classList.remove('show');
@@ -1437,11 +1401,6 @@
       }
       toast('수정했어요');
     }else{
-      // 30건 무료 한도 체크 (신규 등록 시)
-      if(!isPremium() && records.length >= 30){
-        openPremiumModal('무료 기록 30건을 달성하셨어요 🎉', '수백 건의 경조사비 무제한 등록과 평생 안전 보관은 프리미엄에서 지원됩니다.');
-        return;
-      }
       targetRec = {
         id: String(Date.now()),
         name: form.name.trim(),
@@ -1522,18 +1481,37 @@
   }
 
   // 클라우드 서비스 이벤트 등록
+  const OWNER_KEY = 'gyeongjosa_owner';         // 이 기기 로컬 기록의 주인 계정 (계정 간 섞임 방지)
+  const PENDING_INVITE_KEY = 'pending_invite';  // 로그인하러 다녀오는 동안 초대 코드 보관
   if(window.CloudService){
     window.CloudService.onAuthStateChange(async (user, group) => {
       updateAuthUI(user, group);
-      if(user && group){
-        const cloudRecords = await window.CloudService.fetchRecords();
-        if(cloudRecords && cloudRecords.length > 0){
-          const localMap = new Map(records.map(r => [String(r.id), r]));
-          cloudRecords.forEach(cr => localMap.set(String(cr.id), cr));
-          records = Array.from(localMap.values());
-          save();
-          render();
+      render();
+      if(!user || !group) return;
+
+      const owner = localStorage.getItem(OWNER_KEY);
+      if(owner && owner !== user.id){
+        // 다른 계정이 남긴 로컬 기록은 현재 계정 장부에 올리지 않고 백업만 남김
+        if(records.length) localStorage.setItem(`${STORAGE_KEY}_backup_${owner}`, JSON.stringify(records));
+        records = [];
+        save();
+      }
+      if(owner !== user.id){
+        // 이 기기에서 처음 로그인: 로그인 전에 쓴 기록을 클라우드 장부에 올림
+        localStorage.setItem(OWNER_KEY, user.id);
+        if(records.length){
+          const up = await window.CloudService.syncLocalToCloud(records);
+          if(up.skipped) toast(`형식이 맞지 않는 기록 ${up.skipped}건은 이 기기에만 저장돼요`);
         }
+      }
+
+      const cloudRecords = await window.CloudService.fetchRecords();
+      if(cloudRecords && cloudRecords.length > 0){
+        const localMap = new Map(records.map(r => [String(r.id), r]));
+        cloudRecords.forEach(cr => localMap.set(String(cr.id), cr));
+        records = Array.from(localMap.values());
+        save();
+        render();
       }
     });
 
@@ -1541,21 +1519,31 @@
     window.CloudService.init();
   }
 
-  userBtn.addEventListener('click', () => { dropdown.classList.toggle('show'); });
+  userBtn.addEventListener('click', e => { e.stopPropagation(); dropdown.classList.toggle('show'); });
   loginKakaoBtn.addEventListener('click', () => {
     dropdown.classList.remove('show');
     window.CloudService.loginWithKakao();
   });
   logoutBtn.addEventListener('click', async () => {
     dropdown.classList.remove('show');
+    // 로컬 기록을 먼저 클라우드에 저장한 뒤 이 기기에서 지움 (공유 기기에서 장부 노출 방지)
+    const up = await window.CloudService.syncLocalToCloud(records);
+    if(!up.success || up.skipped){
+      toast(up.success
+        ? `형식 오류로 저장되지 않은 기록 ${up.skipped}건이 있어요. 수정하거나 엑셀로 내보낸 뒤 다시 시도해주세요`
+        : '클라우드 저장에 실패해 로그아웃을 멈췄어요');
+      return;
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(OWNER_KEY);
     await window.CloudService.logout();
-    toast('로그아웃되었습니다');
   });
 
-  // ===== 프리미엄 상태 및 페이월 모달 컨트롤러 =====
-  let isPremiumState = localStorage.getItem('is_premium') === 'true';
+  // ===== 공유 장부(유료) 상태 및 페이월 모달 컨트롤러 =====
+  // 권한은 서버(/api/auth/me)가 내려주는 장부 단위 권한으로만 판단
   function isPremium(){
-    return isPremiumState;
+    const grp = window.CloudService ? window.CloudService.getGroup() : null;
+    return !!(grp && grp.premium);
   }
 
   const premiumModal = document.getElementById('premiumModal');
@@ -1564,78 +1552,49 @@
   const closePremiumModalBtn = document.getElementById('closePremiumModalBtn');
   const buyPremiumBtn = document.getElementById('buyPremiumBtn');
   const buyBtnText = document.getElementById('buyBtnText');
+  const premiumGuarantee = document.getElementById('premiumGuarantee');
   const premiumHeaderBtn = document.getElementById('premiumHeaderBtn');
-  const menuPremiumBtn = document.getElementById('menuPremiumBtn');
-  const unlockLinkBtn = document.getElementById('unlockLinkBtn');
+  const haveInviteBtn = document.getElementById('haveInviteBtn');
   const planLifetime = document.getElementById('planLifetime');
   const planSeason = document.getElementById('planSeason');
-  let selectedPlan = 'lifetime';
 
-  function updateLimitUI(){
-    const limitStatusEl = document.getElementById('limitStatus');
-    const headerBtn = document.getElementById('premiumHeaderBtn');
-    if(!limitStatusEl || !headerBtn) return;
+  const PLAN_COPY = {
+    lifetime: { cta: '9,900원으로 공유 장부 시작하기', note: '1회 결제 · 서비스 운영 기간 동안 추가 결제 없음' },
+    season: { cta: '5,900원으로 6개월 시작하기', note: '6개월 이용 · 자동 갱신 없음' }
+  };
 
-    if(isPremium()){
-      limitStatusEl.textContent = `기록 ${records.length}건 · 👑 무제한`;
-      limitStatusEl.className = 'limit-status';
-      headerBtn.textContent = '👑 평생 회원';
-      headerBtn.classList.add('active-vip');
-    } else {
-      const count = records.length;
-      limitStatusEl.textContent = `기록 ${count}/30건 (무료)`;
-      if(count >= 30){
-        limitStatusEl.className = 'limit-status reached-limit';
-      } else if(count >= 25){
-        limitStatusEl.className = 'limit-status near-limit';
-      } else {
-        limitStatusEl.className = 'limit-status';
-      }
-      headerBtn.textContent = '👑 평생 소장권';
-      headerBtn.classList.remove('active-vip');
-    }
+  function updatePremiumUI(){
+    premiumHeaderBtn.textContent = isPremium() ? '💑 공유 중' : '💑 부부 공유';
+    premiumHeaderBtn.classList.toggle('active-vip', isPremium());
   }
 
   function openPremiumModal(title, subtitle){
-    if(title) premiumModalTitle.textContent = title;
-    else premiumModalTitle.textContent = '얼마내쏘 프리미엄';
-    if(subtitle) premiumModalSubtitle.textContent = subtitle;
-    else premiumModalSubtitle.textContent = '소중한 경조사비, 평생 안전하고 편리하게 관리하세요.';
+    premiumModalTitle.textContent = title || '부부·가족 공유 장부';
+    premiumModalSubtitle.textContent = subtitle || '배우자·가족과 한 장부를 실시간으로 함께 기록해요.';
     premiumModal.classList.add('show');
   }
   function closePremiumModal(){
     premiumModal.classList.remove('show');
   }
 
-  if(planLifetime && planSeason){
-    planLifetime.addEventListener('click', () => {
-      selectedPlan = 'lifetime';
-      planLifetime.classList.add('active');
-      planSeason.classList.remove('active');
-      buyBtnText.textContent = '지금 9,900원으로 평생 소장하기';
-    });
-    planSeason.addEventListener('click', () => {
-      selectedPlan = 'season';
-      planSeason.classList.add('active');
-      planLifetime.classList.remove('active');
-      buyBtnText.textContent = '지금 5,900원으로 6개월 시작하기';
-    });
+  function selectPlan(plan){
+    planLifetime.classList.toggle('active', plan === 'lifetime');
+    planSeason.classList.toggle('active', plan === 'season');
+    buyBtnText.textContent = PLAN_COPY[plan].cta;
+    premiumGuarantee.textContent = PLAN_COPY[plan].note;
   }
+  planLifetime.addEventListener('click', () => selectPlan('lifetime'));
+  planSeason.addEventListener('click', () => selectPlan('season'));
 
-  if(buyPremiumBtn){
-    buyPremiumBtn.addEventListener('click', () => {
-      isPremiumState = true;
-      localStorage.setItem('is_premium', 'true');
-      closePremiumModal();
-      render();
-      toast('👑 얼마내쏘 평생 소장권이 활성화되었습니다!');
-    });
-  }
-  if(closePremiumModalBtn) closePremiumModalBtn.addEventListener('click', closePremiumModal);
-  if(premiumModal) premiumModal.addEventListener('click', e => { if(e.target === premiumModal) closePremiumModal(); });
-  if(premiumHeaderBtn) premiumHeaderBtn.addEventListener('click', () => openPremiumModal());
-  if(menuPremiumBtn) menuPremiumBtn.addEventListener('click', () => { dropdown.classList.remove('show'); openPremiumModal(); });
-  if(unlockLinkBtn) unlockLinkBtn.addEventListener('click', () => openPremiumModal());
+  // ponytail: 실결제 연동(Phase 1) 전까지 안내만 표시. 권한은 D1 entitlements 테이블에 직접 부여.
+  buyPremiumBtn.addEventListener('click', () => toast('결제는 곧 열려요. 조금만 기다려주세요'));
+  closePremiumModalBtn.addEventListener('click', closePremiumModal);
+  premiumModal.addEventListener('click', e => { if(e.target === premiumModal) closePremiumModal(); });
+  premiumHeaderBtn.addEventListener('click', () => {
+    if(isPremium()) openShareModal();
+    else openPremiumModal();
+  });
+  haveInviteBtn.addEventListener('click', () => { closePremiumModal(); openShareModal(); });
 
   // ===== 감사 답례 카톡 문구 모달 컨트롤러 =====
   const thankyouBtn = document.getElementById('thankyouBtn');
@@ -1714,19 +1673,25 @@
     });
   }
 
-  // 공유 모달 열기 (프리미엄 페이월 체크)
-  shareLedgerBtn.addEventListener('click', () => {
-    dropdown.classList.remove('show');
-    if(!isPremium()){
-      openPremiumModal('부부·가족 실시간 공유 💑', '신랑과 신부가 실시간으로 함께 쓰고 관리하는 장부는 프리미엄 전용 기능입니다.');
-      return;
-    }
+  // 공유 모달: 내 초대 코드는 공유 장부 권한이 있을 때만, 초대받은 장부 참여는 누구나
+  const myInviteSection = document.getElementById('myInviteSection');
+  function openShareModal(){
     const grp = window.CloudService ? window.CloudService.getGroup() : null;
+    myInviteSection.style.display = isPremium() ? '' : 'none';
     if(grp && grp.inviteCode) myInviteCode.textContent = grp.inviteCode;
     shareModal.classList.add('show');
+  }
+  function closeShareModal(){
+    shareModal.classList.remove('show');
+    sessionStorage.removeItem(PENDING_INVITE_KEY);
+  }
+  shareLedgerBtn.addEventListener('click', () => {
+    dropdown.classList.remove('show');
+    if(isPremium()) openShareModal();
+    else openPremiumModal();
   });
-  closeShareModalBtn.addEventListener('click', () => shareModal.classList.remove('show'));
-  shareModal.addEventListener('click', e => { if(e.target === shareModal) shareModal.classList.remove('show'); });
+  closeShareModalBtn.addEventListener('click', closeShareModal);
+  shareModal.addEventListener('click', e => { if(e.target === shareModal) closeShareModal(); });
 
   // 초대 코드 복사
   copyInviteCodeBtn.addEventListener('click', () => {
@@ -1743,22 +1708,32 @@
 
   // 초대 코드로 장부 참여
   joinGroupBtn.addEventListener('click', async () => {
-    const code = joinCodeInput.value.trim();
+    const code = joinCodeInput.value.trim().toUpperCase();
     if(!code){ toast('초대 코드를 입력해주세요'); return; }
+    if(!window.CloudService.getUser()){
+      // 로그인하고 돌아오면 초대 모달을 다시 열어 이어서 연결
+      sessionStorage.setItem(PENDING_INVITE_KEY, code);
+      toast('카카오 로그인 후 이어서 연결해요');
+      setTimeout(() => window.CloudService.loginWithKakao(), 600);
+      return;
+    }
     joinGroupBtn.disabled = true;
     joinGroupBtn.textContent = '연결 중...';
     const res = await window.CloudService.joinByInviteCode(code);
-    joinGroupBtn.disabled = false;
-    joinGroupBtn.textContent = '장부 연결 및 합치기';
     if(res && res.success){
-      toast(res.message || '장부에 연결되었습니다');
-      shareModal.classList.remove('show');
-      joinCodeInput.value = '';
+      // 이 기기의 기록을 새 장부에 먼저 올리고, 전부 올라간 경우에만 장부 기록으로 교체 (로컬 유실 방지)
+      const up = await window.CloudService.syncLocalToCloud(records);
       const recs = await window.CloudService.fetchRecords();
-      if(recs){ records = recs; save(); render(); }
+      if(recs && up.success && !up.skipped){ records = recs; save(); }
+      render();
+      toast(res.message || '장부에 연결되었습니다');
+      closeShareModal();
+      joinCodeInput.value = '';
     } else {
       toast(res ? res.message : '연결에 실패했습니다');
     }
+    joinGroupBtn.disabled = false;
+    joinGroupBtn.textContent = '장부 연결 및 합치기';
   });
 
 
@@ -1793,7 +1768,7 @@
       sanitizeCsvCell(r.relation),
       sanitizeCsvCell(r.category),
       r.amount || 0,
-      r.date || '',
+      sanitizeCsvCell(r.date),
       sanitizeCsvCell(r.memo)
     ]);
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
@@ -1852,17 +1827,18 @@
         let added = 0;
         // 첫 줄(헤더) 건너뛰고 파싱
         for(let i = 1; i < lines.length; i++){
-          const cols = parseCSVLine(lines[i]);
+          // 내보내기 때 붙인 수식 방어용 ' 접두어 제거
+          const cols = parseCSVLine(lines[i]).map(c => c.replace(/^'(?=[=+\-@\t\r])/, ''));
           if(cols.length >= 5){
             const dir = cols[0] === '받음' || cols[0].toLowerCase() === 'receive' ? 'receive' : 'give';
             const name = cols[1];
             const rel = cols[2] || '기타';
             const cat = cols[3] || '기타';
             const amt = parseInt(cols[4].replace(/[^\d]/g, ''), 10) || 0;
-            const dt = cols[5] || todayStr();
+            const dt = cols[5] ? normalizeDate(cols[5]) : todayStr();
             const memo = cols[6] || '';
 
-            if(name && amt > 0){
+            if(name && amt > 0 && /^\d{4}-\d{2}-\d{2}$/.test(dt)){
               records.push({
                 id: String(Date.now() + Math.floor(Math.random() * 10000)),
                 direction: dir,
@@ -1905,14 +1881,21 @@
     }
   });
 
-  // URL 초대 코드 파라미터 처리 (?invite=CODE)
+  // URL 파라미터 처리 (?invite=CODE, ?login_failed=1) 후 주소창에서 제거
   const urlParams = new URLSearchParams(window.location.search);
-  const inviteParam = urlParams.get('invite');
+  if(urlParams.has('invite') || urlParams.has('login_failed')){
+    history.replaceState(null, '', window.location.pathname);
+  }
+  if(urlParams.has('login_failed')){
+    setTimeout(() => toast('카카오 로그인에 실패했어요. 다시 시도해주세요'), 300);
+  }
+  const inviteParam = (urlParams.get('invite') || sessionStorage.getItem(PENDING_INVITE_KEY) || '').toUpperCase();
   if(inviteParam){
-    joinCodeInput.value = inviteParam.toUpperCase();
+    sessionStorage.setItem(PENDING_INVITE_KEY, inviteParam);
+    joinCodeInput.value = inviteParam;
     setTimeout(() => {
-      shareModal.classList.add('show');
-      toast('배우자 초대 코드가 입력되었습니다. 연결을 확인해주세요.');
+      openShareModal();
+      toast('초대 코드가 입력되었어요. 연결을 눌러주세요');
     }, 500);
   }
 

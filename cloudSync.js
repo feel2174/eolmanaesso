@@ -143,21 +143,27 @@
     }
   }
 
-  // 로컬 기록 전체 일괄 업로드
+  // 로컬 기록 전체 일괄 업로드 (서버 배치 상한 500건 단위로 분할)
   async function syncLocalToCloud(localRecords) {
-    if (!currentUser || !localRecords || localRecords.length === 0) {
-      return { success: false, count: 0 };
-    }
+    if (!currentUser) return { success: false, count: 0, skipped: 0 };
+    let count = 0, skipped = 0;
     try {
-      const res = await fetch('/api/records', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(localRecords)
-      });
-      const data = await res.json();
-      return { success: res.ok, count: localRecords.length, ...data };
+      for (let i = 0; i < (localRecords || []).length; i += 500) {
+        const res = await fetch('/api/records', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(localRecords.slice(i, i + 500))
+        });
+        const data = await res.json().catch(() => ({}));
+        // 청크 전체가 형식 오류(400)면 건너뛴 것으로 집계하고 계속 진행
+        if (res.status === 400 && data.skipped) { skipped += data.skipped; continue; }
+        if (!res.ok) return { success: false, count, skipped };
+        count += data.count || 0;
+        skipped += data.skipped || 0;
+      }
+      return { success: true, count, skipped };
     } catch (e) {
-      return { success: false, message: e.message };
+      return { success: false, count, skipped };
     }
   }
 

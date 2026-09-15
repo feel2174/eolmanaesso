@@ -1,50 +1,28 @@
-import { createSessionToken, ensureTables } from '../_auth.js';
-
+// GET /api/auth/kakao : 카카오 로그인 시작 (로그인 CSRF 방지용 state 쿠키 발급)
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
-  const redirectUri = `${url.origin}/api/auth/callback`;
-
   const kakaoClientId = env.KAKAO_CLIENT_ID || env.KAKAO_REST_API_KEY;
 
-  // 1. 카카오 공식 키가 설정되어 있는 경우 정상 OAuth 리다이렉트
-  if (kakaoClientId) {
-    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-    return Response.redirect(kakaoAuthUrl, 302);
+  if (!kakaoClientId) {
+    console.error('KAKAO_CLIENT_ID 미설정');
+    return Response.redirect(`${url.origin}/?login_failed=1`, 302);
   }
 
-  // 2. 카카오 키 설정 전이어도 즉시 테스트 가능한 데모 카카오 로그인 자동 생성
-  try {
-    const mockUser = {
-      id: 'user_kakao_demo',
-      kakao_id: 'demo_kakao_12345',
-      nickname: '카카오 사용자',
-      avatar_url: 'https://k.kakaocdn.net/dn/dpk9l1/btqmGhA2lKL/70EA45abQtKOWflKiUK5K1/img_110x110.jpg'
-    };
+  const state = crypto.randomUUID();
+  const authUrl = new URL('https://kauth.kakao.com/oauth/authorize');
+  authUrl.search = new URLSearchParams({
+    client_id: kakaoClientId,
+    redirect_uri: `${url.origin}/api/auth/callback`,
+    response_type: 'code',
+    state
+  }).toString();
 
-    if (env.DB) {
-      try {
-        await ensureTables(env.DB);
-        await env.DB.prepare(`
-          INSERT OR IGNORE INTO users (id, kakao_id, nickname, avatar_url)
-          VALUES (?, ?, ?, ?)
-        `).bind(mockUser.id, mockUser.kakao_id, mockUser.nickname, mockUser.avatar_url).run();
-      } catch (e) {
-        console.warn('D1 mock user insert error:', e);
-      }
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': authUrl.toString(),
+      'Set-Cookie': `oauth_state=${state}; Path=/api/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=600`
     }
-
-    const sessionToken = await createSessionToken(mockUser, env);
-
-    return new Response(null, {
-      status: 302,
-      headers: {
-        'Location': `${url.origin}/`,
-        'Set-Cookie': `session_token=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
-      }
-    });
-  } catch (err) {
-    console.error('kakao.js error:', err);
-    return Response.redirect(`${url.origin}/`, 302);
-  }
+  });
 }
