@@ -12,6 +12,16 @@ function base64DecodeUnicode(str) {
   return decodeURIComponent(escape(atob(str)));
 }
 
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= (a.charCodeAt(i) ^ b.charCodeAt(i));
+  }
+  return mismatch === 0;
+}
+
 async function hmacSha256(keyStr, dataStr) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -40,7 +50,7 @@ export async function getSessionFromRequest(request, env) {
     
     const secret = (env && env.JWT_SECRET) || DEFAULT_SECRET;
     const expectedSig = await hmacSha256(secret, payloadBase64);
-    if (providedSig !== expectedSig) {
+    if (!timingSafeEqual(providedSig, expectedSig)) {
       console.warn('세션 토큰 서명 불일치 (위조 시도)');
       return null;
     }
