@@ -64,9 +64,15 @@ export async function onRequestPost(context) {
     return jsonResponse({ error: `한 번에 1~${MAX_BATCH}건까지 저장할 수 있습니다.` }, 400);
   }
 
-  const valid = items.map(validateRecord).filter(Boolean);
+  const valid = [];
+  const skippedIds = [];
+  for (const it of items) {
+    const rec = validateRecord(it);
+    if (rec) valid.push(rec);
+    else skippedIds.push(String((it && it.id) ?? ''));
+  }
   if (valid.length === 0) {
-    return jsonResponse({ error: '저장할 수 있는 올바른 기록이 없습니다.', skipped: items.length }, 400);
+    return jsonResponse({ error: '저장할 수 있는 올바른 기록이 없습니다.', skipped: skippedIds.length, skippedIds }, 400);
   }
 
   try {
@@ -103,7 +109,7 @@ export async function onRequestPost(context) {
       r.id, groupId, session.userId, r.direction, r.name, r.relation, r.category, r.amount, r.date, r.memo
     )));
 
-    return jsonResponse({ success: true, count: valid.length, skipped: items.length - valid.length });
+    return jsonResponse({ success: true, count: valid.length, skipped: skippedIds.length, skippedIds });
   } catch (err) {
     console.error('records POST error:', err);
     return jsonResponse({ error: '기록 저장 중 오류가 발생했습니다.' }, 500);

@@ -1,8 +1,10 @@
-﻿{
+{
+  "id": "/index.html",
   "name": "얼마내쏘 · 경조사 장부",
   "short_name": "얼마내쏘",
   "description": "물가 반영 축의금 추천과 부부 실시간 공유가 가능한 스마트 경조사 장부",
-  "start_url": "./index.html",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F7F4EA",

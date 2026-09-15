@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://howmuch-bongtoo.pages.dev/sitemap.xml

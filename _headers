@@ -1,7 +1,7 @@
 # 정적 자산 보안 헤더 (Functions 응답에는 적용되지 않음)
-# ponytail: script-src 'unsafe-inline'은 index.html 인라인 스크립트 때문. 스크립트를 파일로 분리하면(Phase 1) 제거.
+# 인라인 <script>는 금지 (앱 로직은 app.js). style-src 'unsafe-inline'은 마크업의 style 속성 때문에 유지.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: https://*.kakaocdn.net; connect-src 'self' https://cdn.jsdelivr.net; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: https://*.kakaocdn.net; connect-src 'self' https://cdn.jsdelivr.net; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   Strict-Transport-Security: max-age=31536000
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff

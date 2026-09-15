@@ -23,6 +23,14 @@ export async function onRequestGet(context) {
     // DB 테이블 자동 점검 및 생성
     await ensureTables(env.DB);
 
+    // 탈퇴한 계정의 남은 세션은 로그인 상태로 보지 않음
+    const userRow = await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(session.userId).first();
+    if (!userRow) {
+      return jsonResponse({ authenticated: false }, 200, {
+        'Set-Cookie': 'session_token=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
+      });
+    }
+
     // 1. 사용자 소속 그룹 조회
     const memberRow = await env.DB.prepare(`
       SELECT lm.group_id, lm.role, lg.name, lg.invite_code, lg.created_by

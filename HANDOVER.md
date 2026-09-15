@@ -125,6 +125,8 @@ npx wrangler pages dev . --port 3000
 ### 4.5. TDD 로직 단위 테스트 실행
 ```bash
 node tests/record-lifecycle.test.mjs
+node tests/phase0-security.test.mjs   # 인증·OAuth state·입력 검증·공유 권한·탈퇴 (실제 API 코드 import)
+node tests/sync-outbox.test.mjs       # 변경 대기열 동기화 (cloudSync.js 실제 코드)
 ```
 * 외부 의존성(Jest, Mocha 등) 없이 Node.js 내장 `assert`로 7개 핵심 시나리오가 1초 내에 검증됩니다.
 
@@ -187,6 +189,12 @@ node tests/record-lifecycle.test.mjs
   - 배우자의 초대 코드를 입력하면 기존 개인 장부에서 새 부부 장부로 이동(멤버 교체를 하나의 D1 batch로 처리).
   - 혼자 쓰던 장부의 기록은 새 장부로 함께 옮김. 다른 멤버가 남는 장부의 기록은 그 장부에 둠.
   - 비로그인 상태로 초대 링크를 열면 코드를 sessionStorage에 보관하고 카카오 로그인 후 이어서 연결.
+* **동기화 (cloudSync.js 변경 대기열)**:
+  - 로그인 상태의 추가·수정·삭제는 localStorage `gyeongjosa_outbox`에 먼저 쌓고 서버로 전송. 실패·오프라인이면 남겨두고 25초 폴링·포커스·네트워크 복구 때 재전송.
+  - 동기화는 "대기열 전송 → 서버 기록 조회 → 남은 대기 변경을 겹침" 순서라 다른 기기의 삭제가 반영되고, 오프라인 삭제가 되살아나지 않음.
+  - 서버 검증에서 거절된 기록(`skippedIds`)은 이 기기에만 보관(`invalid`), 수정하면 다시 전송.
+  - 새 기록 id는 `crypto.randomUUID()` (기존 숫자 id는 그대로 호환).
+* **회원 탈퇴 (`POST /api/auth/withdraw`)**: 계정·멤버십 삭제, 혼자 쓰던 장부는 기록·권한·장부까지 삭제, 가족이 남은 공유 장부 기록은 유지. `KAKAO_ADMIN_KEY` 환경변수가 있으면 카카오 연결 끊기까지 처리.
 
 ### 6.3. 보안 설계 (Security Hardened)
 * **HMAC-SHA256 + Timing-Safe**:

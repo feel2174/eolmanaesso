@@ -4,6 +4,7 @@ import { onRequestGet as kakaoLogin } from '../functions/api/auth/kakao.js';
 import { onRequestGet as kakaoCallback } from '../functions/api/auth/callback.js';
 import { onRequestPost as postRecords } from '../functions/api/records.js';
 import { onRequestPost as joinGroup } from '../functions/api/group.js';
+import { onRequestPost as withdraw } from '../functions/api/auth/withdraw.js';
 
 const ENV = { JWT_SECRET: 'test-secret-0123456789abcdef', KAKAO_CLIENT_ID: 'kakao-test' };
 const ORIGIN = 'https://app.test';
@@ -58,7 +59,7 @@ const recDb = mockDb(sql => sql.includes('ledger_members') ? { group_id: 'g1' } 
 const tooMany = await postRecords({ request: authed('/api/records', { method: 'POST', body: JSON.stringify(Array(501).fill(good)) }), env: { ...ENV, DB: recDb } });
 assert.strictEqual(tooMany.status, 400);
 const mixed = await postRecords({ request: authed('/api/records', { method: 'POST', body: JSON.stringify([good, { ...good, id: '2', amount: 'abc' }]) }), env: { ...ENV, DB: recDb } });
-assert.deepStrictEqual(await mixed.json(), { success: true, count: 1, skipped: 1 });
+assert.deepStrictEqual(await mixed.json(), { success: true, count: 1, skipped: 1, skippedIds: ['2'] });
 console.log('✅ 5. 배치 500건 상한 · 잘못된 항목 건너뜀');
 
 // 6. 공유 장부 참여: 권한 없는 장부는 서버에서 차단 (유료 기능)
@@ -81,5 +82,19 @@ assert.strictEqual(joinedJson.group.inviteCode, 'ABCD2345', '클라이언트가 
 const joinBatch = paidDb.batches.at(-1).map(s => s.sql);
 assert.ok(joinBatch.some(sql => sql.includes('UPDATE records SET group_id')), '혼자 쓰던 장부 기록은 새 장부로 이동');
 console.log('✅ 6. 무료 장부 참여 차단 · 권한 장부 참여 시 기록 이동');
+
+// 7. 회원 탈퇴: 혼자 쓰던 장부는 기록까지 삭제, 가족이 남은 공유 장부의 기록은 유지
+for (const [members, deletesRecords] of [[1, true], [2, false]]) {
+  const db = mockDb(sql =>
+    sql.includes('user_id = ? LIMIT 1') ? { group_id: 'g1' } :
+    sql.includes('COUNT(*)') ? { n: members } : null);
+  const res = await withdraw({ request: authed('/api/auth/withdraw', { method: 'POST' }), env: { ...ENV, DB: db } });
+  assert.strictEqual(res.status, 200);
+  assert.match(res.headers.get('Set-Cookie'), /session_token=;.*Max-Age=0/);
+  const sqls = db.batches.at(-1).map(s => s.sql);
+  assert.ok(sqls.some(s => s.includes('DELETE FROM users')));
+  assert.strictEqual(sqls.some(s => s.includes('DELETE FROM records')), deletesRecords, `멤버 ${members}명`);
+}
+console.log('✅ 7. 회원 탈퇴 데이터 삭제 범위');
 
 console.log('\n🎉 Phase 0 보안 테스트 통과');
