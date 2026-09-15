@@ -1,0 +1,18 @@
+﻿{
+  "name": "얼마내쏘 · 경조사 장부",
+  "short_name": "얼마내쏘",
+  "description": "물가 반영 축의금 추천과 부부 실시간 공유가 가능한 스마트 경조사 장부",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7F4EA",
+  "theme_color": "#FEE500",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="115" fill="#FEE500"/>
+  <!-- 봉투 몸체 -->
+  <path d="M96 170 C96 150 110 134 130 134 L382 134 C402 134 416 150 416 170 L416 342 C416 362 402 378 382 378 L130 378 C110 378 96 362 96 342 Z" fill="#FFFFFF" filter="drop-shadow(0 10px 20px rgba(60,30,30,0.12))"/>
+  <!-- 봉투 덮개 -->
+  <path d="M96 142 L256 265 L416 142" fill="none" stroke="#E8E4D8" stroke-width="8" stroke-linejoin="round"/>
+  <!-- 하트 & 금화 심볼 -->
+  <circle cx="256" cy="285" r="54" fill="#FEE500" stroke="#3C1E1E" stroke-width="8"/>
+  <text x="256" y="302" font-family="-apple-system, sans-serif" font-size="44" font-weight="900" fill="#3C1E1E" text-anchor="middle">₩</text>
+</svg>
