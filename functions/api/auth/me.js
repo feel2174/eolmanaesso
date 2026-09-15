@@ -1,0 +1,70 @@
+﻿import { getSessionFromRequest, jsonResponse } from '../_auth.js';
+
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  const session = getSessionFromRequest(request, env);
+
+  if (!session || !session.userId) {
+    return jsonResponse({ authenticated: false });
+  }
+
+  // D1 DB가 바인딩되어 있는지 확인
+  if (!env.DB) {
+    return jsonResponse({
+      authenticated: true,
+      user: { id: session.userId, nickname: session.nickname, avatarUrl: session.avatarUrl },
+      group: { id: 'local-group', name: '나의 장부', inviteCode: 'OFFLINE' }
+    });
+  }
+
+  try {
+    // 1. 사용자 소속 그룹 조회
+    const memberRow = await env.DB.prepare(`
+      SELECT lm.group_id, lm.role, lg.name, lg.invite_code, lg.created_by
+      FROM ledger_members lm
+      JOIN ledger_groups lg ON lm.group_id = lg.id
+      WHERE lm.user_id = ?
+      LIMIT 1
+    `).bind(session.userId).first();
+
+    let group = null;
+    if (memberRow) {
+      group = {
+        id: memberRow.group_id,
+        name: memberRow.name,
+        inviteCode: memberRow.invite_code,
+        role: memberRow.role
+      };
+    } else {
+      // 그룹이 없으면 기본 그룹 자동 생성
+      const newGroupId = crypto.randomUUID();
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const groupName = `${session.nickname}의 장부`;
+
+      await env.DB.prepare(`
+        INSERT INTO ledger_groups (id, name, invite_code, created_by)
+        VALUES (?, ?, ?, ?)
+      `).bind(newGroupId, groupName, inviteCode, session.userId).run();
+
+      await env.DB.prepare(`
+        INSERT INTO ledger_members (group_id, user_id, role)
+        VALUES (?, ?, 'owner')
+      `).bind(newGroupId, session.userId).run();
+
+      group = { id: newGroupId, name: groupName, inviteCode, role: 'owner' };
+    }
+
+    return jsonResponse({
+      authenticated: true,
+      user: {
+        id: session.userId,
+        nickname: session.nickname,
+        avatarUrl: session.avatarUrl
+      },
+      group
+    });
+  } catch (err) {
+    console.error('me.js error:', err);
+    return jsonResponse({ authenticated: false, error: err.message }, 500);
+  }
+}
