@@ -3,7 +3,7 @@ import { getSessionFromRequest, jsonResponse, ensureTables } from './_auth.js';
 // GET: 소속 장부의 모든 기록 조회
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const session = getSessionFromRequest(request, env);
+  const session = await getSessionFromRequest(request, env);
 
   if (!session || !session.userId) {
     return jsonResponse({ error: '로그인이 필요합니다.' }, 401);
@@ -35,14 +35,14 @@ export async function onRequestGet(context) {
     return jsonResponse({ records: results || [] });
   } catch (err) {
     console.error('records GET error:', err);
-    return jsonResponse({ error: err.message }, 500);
+    return jsonResponse({ error: '기록 조회 중 오류가 발생했습니다.' }, 500);
   }
 }
 
 // POST: 기록 단건 추가/수정 또는 배열 일괄 동기화
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = getSessionFromRequest(request, env);
+  const session = await getSessionFromRequest(request, env);
 
   if (!session || !session.userId) {
     return jsonResponse({ error: '로그인이 필요합니다.' }, 401);
@@ -69,7 +69,7 @@ export async function onRequestPost(context) {
 
     const groupId = member.group_id;
 
-    // D1 쿼리 준비 (Upsert)
+    // D1 쿼리 준비 (Upsert with Group IDOR Protection)
     const stmt = env.DB.prepare(`
       INSERT INTO records (id, group_id, user_id, direction, name, relation, category, amount, date, memo, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -82,6 +82,7 @@ export async function onRequestPost(context) {
         date = excluded.date,
         memo = excluded.memo,
         updated_at = CURRENT_TIMESTAMP
+      WHERE records.group_id = excluded.group_id
     `);
 
     const batch = items.map(it => stmt.bind(
@@ -102,14 +103,14 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: true, count: items.length });
   } catch (err) {
     console.error('records POST error:', err);
-    return jsonResponse({ error: err.message }, 500);
+    return jsonResponse({ error: '기록 저장 중 오류가 발생했습니다.' }, 500);
   }
 }
 
 // DELETE: 기록 삭제
 export async function onRequestDelete(context) {
   const { request, env } = context;
-  const session = getSessionFromRequest(request, env);
+  const session = await getSessionFromRequest(request, env);
   const url = new URL(request.url);
   const recordId = url.searchParams.get('id');
 

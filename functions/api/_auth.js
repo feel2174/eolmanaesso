@@ -12,16 +12,38 @@ function base64DecodeUnicode(str) {
   return decodeURIComponent(escape(atob(str)));
 }
 
-// 쿠키에서 세션 토큰 추출
-export function getSessionFromRequest(request, env) {
+async function hmacSha256(keyStr, dataStr) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(keyStr),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, enc.encode(dataStr));
+  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 쿠키에서 세션 토큰 추출 및 HMAC 검증
+export async function getSessionFromRequest(request, env) {
   const cookieHeader = request.headers.get('Cookie') || '';
   const match = cookieHeader.match(/session_token=([^;]+)/);
   if (!match) return null;
   
   try {
     const raw = decodeURIComponent(match[1]);
-    const [payloadBase64, signature] = raw.split('.');
-    if (!payloadBase64) return null;
+    const parts = raw.split('.');
+    if (parts.length !== 2) return null;
+    const [payloadBase64, providedSig] = parts;
+    if (!payloadBase64 || !providedSig) return null;
+    
+    const secret = (env && env.JWT_SECRET) || DEFAULT_SECRET;
+    const expectedSig = await hmacSha256(secret, payloadBase64);
+    if (providedSig !== expectedSig) {
+      console.warn('세션 토큰 서명 불일치 (위조 시도)');
+      return null;
+    }
     
     const payloadJson = base64DecodeUnicode(payloadBase64);
     const payload = JSON.parse(payloadJson);
@@ -35,8 +57,8 @@ export function getSessionFromRequest(request, env) {
   }
 }
 
-// 세션 토큰 생성 (Base64 인코딩)
-export function createSessionToken(user, env) {
+// 세션 토큰 생성 (HMAC-SHA256 암호학적 서명)
+export async function createSessionToken(user, env) {
   const payload = {
     userId: user.id,
     kakaoId: user.kakao_id,
@@ -45,9 +67,18 @@ export function createSessionToken(user, env) {
     exp: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30일
   };
   
+  const secret = (env && env.JWT_SECRET) || DEFAULT_SECRET;
   const payloadBase64 = base64EncodeUnicode(JSON.stringify(payload));
-  // 간단 서명 토큰
-  return `${payloadBase64}.signed`;
+  const signature = await hmacSha256(secret, payloadBase64);
+  return `${payloadBase64}.${signature}`;
+}
+
+// 암호학적으로 안전한 8자리 장부 초대 코드 생성 (CSPRNG)
+export function generateSecureInviteCode() {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const array = new Uint8Array(8);
+  crypto.getRandomValues(array);
+  return Array.from(array).map(b => chars[b % chars.length]).join('');
 }
 
 // 응답 헬퍼

@@ -1,9 +1,9 @@
-﻿import { getSessionFromRequest, jsonResponse } from './_auth.js';
+import { getSessionFromRequest, jsonResponse, ensureTables } from './_auth.js';
 
 // POST: 초대 코드로 부부/가족 공유 장부 연결
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = getSessionFromRequest(request, env);
+  const session = await getSessionFromRequest(request, env);
 
   if (!session || !session.userId) {
     return jsonResponse({ success: false, message: '로그인이 필요합니다.' }, 401);
@@ -14,6 +14,7 @@ export async function onRequestPost(context) {
   }
 
   try {
+    await ensureTables(env.DB);
     const { inviteCode } = await request.json();
     const cleanCode = (inviteCode || '').trim().toUpperCase();
 
@@ -39,9 +40,13 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: true, message: '이미 연결되어 있는 장부입니다.', group: targetGroup });
     }
 
-    // 3. 기존 개인 그룹의 멤버십을 교체하거나 신규 등록
+    // 3. 기존 그룹 탈퇴 후 새 그룹 등록 (1인 1활성 장부 보장)
     await env.DB.prepare(`
-      INSERT OR REPLACE INTO ledger_members (group_id, user_id, role, joined_at)
+      DELETE FROM ledger_members WHERE user_id = ?
+    `).bind(session.userId).run();
+
+    await env.DB.prepare(`
+      INSERT INTO ledger_members (group_id, user_id, role, joined_at)
       VALUES (?, ?, 'member', CURRENT_TIMESTAMP)
     `).bind(targetGroup.id, session.userId).run();
 
@@ -52,6 +57,6 @@ export async function onRequestPost(context) {
     });
   } catch (err) {
     console.error('group/join error:', err);
-    return jsonResponse({ success: false, message: err.message }, 500);
+    return jsonResponse({ success: false, message: '장부 연결 처리 중 오류가 발생했습니다.' }, 500);
   }
 }

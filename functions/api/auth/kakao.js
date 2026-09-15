@@ -33,13 +33,13 @@ export async function onRequestGet(context) {
       }
     }
 
-    const sessionToken = createSessionToken(mockUser, env);
+    const sessionToken = await createSessionToken(mockUser, env);
 
     return new Response(null, {
       status: 302,
       headers: {
         'Location': `${url.origin}/`,
-        'Set-Cookie': `session_token=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
+        'Set-Cookie': `session_token=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
       }
     });
   } catch (err) {

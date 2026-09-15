@@ -1,4 +1,4 @@
-﻿import { createSessionToken } from '../_auth.js';
+import { createSessionToken } from '../_auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -55,13 +55,13 @@ export async function onRequestGet(context) {
     }
 
     // 4. 세션 토큰 생성 및 쿠키 설정 후 메인으로 리다이렉트
-    const sessionToken = createSessionToken({ id: userId, kakao_id: kakaoId, nickname, avatar_url: avatarUrl }, env);
+    const sessionToken = await createSessionToken({ id: userId, kakao_id: kakaoId, nickname, avatar_url: avatarUrl }, env);
 
     return new Response(null, {
       status: 302,
       headers: {
         'Location': `${url.origin}/`,
-        'Set-Cookie': `session_token=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
+        'Set-Cookie': `session_token=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
       }
     });
   } catch (err) {

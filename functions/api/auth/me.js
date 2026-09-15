@@ -1,8 +1,8 @@
-import { getSessionFromRequest, jsonResponse, ensureTables } from '../_auth.js';
+import { getSessionFromRequest, jsonResponse, ensureTables, generateSecureInviteCode } from '../_auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const session = getSessionFromRequest(request, env);
+  const session = await getSessionFromRequest(request, env);
 
   if (!session || !session.userId) {
     return jsonResponse({ authenticated: false });
@@ -41,7 +41,7 @@ export async function onRequestGet(context) {
     } else {
       // 그룹이 없으면 기본 그룹 자동 생성
       const newGroupId = crypto.randomUUID();
-      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const inviteCode = generateSecureInviteCode();
       const groupName = `${session.nickname}의 장부`;
 
       try {
