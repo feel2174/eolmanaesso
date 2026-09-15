@@ -1,5 +1,6 @@
-﻿.DS_Store
+.DS_Store
 Thumbs.db
 *.log
 .env*
+.dev.vars
 node_modules/
