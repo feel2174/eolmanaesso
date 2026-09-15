@@ -1,5 +1,5 @@
-// 얼마내쏘 서비스 워커 (PWA 오프라인 캐싱)
-const CACHE_NAME = 'gyeongjosa-v2';
+// 얼마내쏘 서비스 워커 (PWA 오프라인 지원 & 네트워크 우선 최신 캐싱)
+const CACHE_NAME = 'gyeongjosa-v3-pure-cloudflare';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -10,12 +10,12 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(ASSETS_TO_CACHE).catch(err => console.warn('PWA 캐시 일부 실패:', err));
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -24,26 +24,26 @@ self.addEventListener('activate', event => {
       return Promise.all(
         keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
-  // API 호출 등은 네트워크 우선
+  // API 호출 및 비GET 요청은 서비스 워커 우회
   if (event.request.url.includes('/api/') || event.request.method !== 'GET') {
     return;
   }
+  // 항상 네트워크 우선(Network First): 최신 배포본 즉시 반영, 오프라인 시 캐시 사용
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
-        }
-        return networkResponse;
-      }).catch(() => caches.match('./index.html'));
+    fetch(event.request).then(networkResponse => {
+      if (networkResponse && networkResponse.status === 200) {
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
+      }
+      return networkResponse;
+    }).catch(() => {
+      return caches.match(event.request).then(cached => cached || caches.match('./index.html'));
     })
   );
 });
+

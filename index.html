@@ -9,7 +9,22 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <title>얼마내쏘 · 경조사 장부</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<script src="cloudSync.js"></script>
+<script>
+  // 레거시 Supabase 캐시 및 스토리지 청소 (단 1회 강제 동기화)
+  try {
+    localStorage.removeItem('gyeongjosa_config');
+    localStorage.removeItem('supabase.auth.token');
+    localStorage.removeItem('supabase_config');
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        keys.forEach(k => {
+          if (k !== 'gyeongjosa-v3-pure-cloudflare') caches.delete(k);
+        });
+      });
+    }
+  } catch (e) {}
+</script>
+<script src="cloudSync.js?v=20260915_pure_cf"></script>
 <style>
   :root{
     --bg:#F7F4EA;
@@ -1919,10 +1934,12 @@
   fDate.value = todayStr();
   render();
 
-  // PWA 서비스 워커 등록
+  // PWA 서비스 워커 등록 (최신 버전 강제 업데이트)
   if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW 등록 생략:', err));
+      navigator.serviceWorker.register('./sw.js?v=20260915_pure_cf').then(reg => {
+        reg.update();
+      }).catch(err => console.log('SW 등록 생략:', err));
     });
   }
 })();
