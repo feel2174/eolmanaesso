@@ -1,8 +1,16 @@
-﻿// ==============================================================================
+// ==============================================================================
 // Cloudflare Pages Functions: 인증 및 JWT 유틸리티 (_auth.js)
 // ==============================================================================
 
 const DEFAULT_SECRET = 'howmuch-bongtoo-jwt-secret-key-2026';
+
+function base64EncodeUnicode(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+function base64DecodeUnicode(str) {
+  return decodeURIComponent(escape(atob(str)));
+}
 
 // 쿠키에서 세션 토큰 추출
 export function getSessionFromRequest(request, env) {
@@ -15,7 +23,7 @@ export function getSessionFromRequest(request, env) {
     const [payloadBase64, signature] = raw.split('.');
     if (!payloadBase64) return null;
     
-    const payloadJson = atob(payloadBase64);
+    const payloadJson = base64DecodeUnicode(payloadBase64);
     const payload = JSON.parse(payloadJson);
     
     // 만료일 검사 (30일)
@@ -37,7 +45,7 @@ export function createSessionToken(user, env) {
     exp: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30일
   };
   
-  const payloadBase64 = btoa(JSON.stringify(payload));
+  const payloadBase64 = base64EncodeUnicode(JSON.stringify(payload));
   // 간단 서명 토큰
   return `${payloadBase64}.signed`;
 }
