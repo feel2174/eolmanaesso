@@ -1,33 +1,45 @@
-﻿export async function onRequestGet(context) {
+﻿import { createSessionToken } from '../_auth.js';
+
+export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const redirectUri = `${url.origin}/api/auth/callback`;
 
   const kakaoClientId = env.KAKAO_CLIENT_ID || env.KAKAO_REST_API_KEY;
 
-  if (!kakaoClientId) {
-    // 카카오 키가 설정되지 않은 경우 데모 로그인 안내
-    return new Response(`
-      <!DOCTYPE html>
-      <html lang="ko">
-      <head><meta charset="utf-8"><title>카카오 설정 안내</title></head>
-      <body style="font-family:sans-serif;padding:30px;line-height:1.6;max-width:500px;margin:0 auto;text-align:center;">
-        <h2>💬 카카오 로그인 안내</h2>
-        <p>Cloudflare Pages 환경 변수(Environment Variables)에<br><b>KAKAO_CLIENT_ID</b>가 설정되어 있지 않습니다.</p>
-        <p style="background:#f5f5f5;padding:12px;border-radius:10px;font-size:13px;text-align:left;">
-          <b>설정 방법:</b><br>
-          1. <a href="https://developers.kakao.com" target="_blank">Kakao Developers</a>에서 앱 생성<br>
-          2. REST API 키를 Cloudflare Pages 설정의 [Environment Variables]에 <code>KAKAO_CLIENT_ID</code>로 등록<br>
-          3. Redirect URI에 <code>${redirectUri}</code> 등록
-        </p>
-        <button onclick="location.href='/?demo_login=1'" style="background:#FEE500;border:none;padding:12px 24px;border-radius:12px;font-weight:bold;cursor:pointer;margin-top:10px;">
-          체험용 데모 계정으로 로그인하기
-        </button>
-      </body>
-      </html>
-    `, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  // 1. 카카오 공식 키가 설정되어 있는 경우 정상 OAuth 리다이렉트
+  if (kakaoClientId) {
+    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+    return Response.redirect(kakaoAuthUrl, 302);
   }
 
-  const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-  return Response.redirect(kakaoAuthUrl, 302);
+  // 2. 카카오 키 설정 전이어도 즉시 테스트 가능한 데모 카카오 로그인 자동 생성
+  const mockUser = {
+    id: 'user_kakao_demo',
+    kakao_id: 'demo_kakao_12345',
+    nickname: '카카오 사용자',
+    avatar_url: 'https://k.kakaocdn.net/dn/dpk9l1/btqmGhA2lKL/70EA45abQtKOWflKiUK5K1/img_110x110.jpg'
+  };
+
+  // D1 DB가 있으면 유저 생성
+  if (env.DB) {
+    try {
+      await env.DB.prepare(`
+        INSERT OR IGNORE INTO users (id, kakao_id, nickname, avatar_url)
+        VALUES (?, ?, ?, ?)
+      `).bind(mockUser.id, mockUser.kakao_id, mockUser.nickname, mockUser.avatar_url).run();
+    } catch (e) {
+      console.warn('D1 mock user insert error:', e);
+    }
+  }
+
+  const sessionToken = createSessionToken(mockUser, env);
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': `${url.origin}/`,
+      'Set-Cookie': `session_token=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
+    }
+  });
 }
