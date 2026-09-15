@@ -1,4 +1,4 @@
-﻿import { getSessionFromRequest, jsonResponse } from './_auth.js';
+import { getSessionFromRequest, jsonResponse, ensureTables } from './_auth.js';
 
 // GET: 소속 장부의 모든 기록 조회
 export async function onRequestGet(context) {
@@ -14,6 +14,7 @@ export async function onRequestGet(context) {
   }
 
   try {
+    await ensureTables(env.DB);
     // 1. 소속 그룹 찾기
     const member = await env.DB.prepare(`
       SELECT group_id FROM ledger_members WHERE user_id = ? LIMIT 1
@@ -52,6 +53,7 @@ export async function onRequestPost(context) {
   }
 
   try {
+    await ensureTables(env.DB);
     const body = await request.json();
     const isBatch = Array.isArray(body);
     const items = isBatch ? body : [body];

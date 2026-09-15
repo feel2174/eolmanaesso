@@ -60,3 +60,50 @@ export function jsonResponse(data, status = 200, headers = {}) {
     }
   });
 }
+
+// D1 데이터베이스 테이블 자동 생성 (Self-healing Schema)
+let tablesInitialized = false;
+export async function ensureTables(db) {
+  if (!db || tablesInitialized) return;
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        kakao_id TEXT UNIQUE NOT NULL,
+        nickname TEXT NOT NULL,
+        avatar_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS ledger_groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT '우리 장부',
+        invite_code TEXT UNIQUE NOT NULL,
+        created_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS ledger_members (
+        group_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        role TEXT DEFAULT 'member',
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (group_id, user_id)
+      );
+      CREATE TABLE IF NOT EXISTS records (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL,
+        user_id TEXT,
+        direction TEXT NOT NULL,
+        name TEXT NOT NULL,
+        relation TEXT NOT NULL,
+        category TEXT NOT NULL,
+        amount INTEGER NOT NULL DEFAULT 0,
+        date TEXT NOT NULL,
+        memo TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    tablesInitialized = true;
+  } catch (e) {
+    console.warn('ensureTables warning:', e.message);
+  }
+}

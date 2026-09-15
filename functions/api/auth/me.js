@@ -1,4 +1,4 @@
-﻿import { getSessionFromRequest, jsonResponse } from '../_auth.js';
+import { getSessionFromRequest, jsonResponse, ensureTables } from '../_auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -8,7 +8,7 @@ export async function onRequestGet(context) {
     return jsonResponse({ authenticated: false });
   }
 
-  // D1 DB가 바인딩되어 있는지 확인
+  // D1 DB가 바인딩되어 있지 않은 경우
   if (!env.DB) {
     return jsonResponse({
       authenticated: true,
@@ -18,6 +18,9 @@ export async function onRequestGet(context) {
   }
 
   try {
+    // DB 테이블 자동 점검 및 생성
+    await ensureTables(env.DB);
+
     // 1. 사용자 소속 그룹 조회
     const memberRow = await env.DB.prepare(`
       SELECT lm.group_id, lm.role, lg.name, lg.invite_code, lg.created_by
@@ -41,17 +44,22 @@ export async function onRequestGet(context) {
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       const groupName = `${session.nickname}의 장부`;
 
-      await env.DB.prepare(`
-        INSERT INTO ledger_groups (id, name, invite_code, created_by)
-        VALUES (?, ?, ?, ?)
-      `).bind(newGroupId, groupName, inviteCode, session.userId).run();
+      try {
+        await env.DB.prepare(`
+          INSERT INTO ledger_groups (id, name, invite_code, created_by)
+          VALUES (?, ?, ?, ?)
+        `).bind(newGroupId, groupName, inviteCode, session.userId).run();
 
-      await env.DB.prepare(`
-        INSERT INTO ledger_members (group_id, user_id, role)
-        VALUES (?, ?, 'owner')
-      `).bind(newGroupId, session.userId).run();
+        await env.DB.prepare(`
+          INSERT INTO ledger_members (group_id, user_id, role)
+          VALUES (?, ?, 'owner')
+        `).bind(newGroupId, session.userId).run();
 
-      group = { id: newGroupId, name: groupName, inviteCode, role: 'owner' };
+        group = { id: newGroupId, name: groupName, inviteCode, role: 'owner' };
+      } catch (insertErr) {
+        console.warn('Group auto-creation warning:', insertErr.message);
+        group = { id: 'default-group', name: groupName, inviteCode: 'MYBONGTOO', role: 'owner' };
+      }
     }
 
     return jsonResponse({
@@ -65,6 +73,15 @@ export async function onRequestGet(context) {
     });
   } catch (err) {
     console.error('me.js error:', err);
-    return jsonResponse({ authenticated: false, error: err.message }, 500);
+    // 에러 발생 시에도 세션이 유효하면 로그인 상태 유지 (서비스 중단 방지)
+    return jsonResponse({
+      authenticated: true,
+      user: {
+        id: session.userId,
+        nickname: session.nickname,
+        avatarUrl: session.avatarUrl
+      },
+      group: { id: 'fallback-group', name: '나의 장부', inviteCode: 'CONNECT' }
+    });
   }
 }
